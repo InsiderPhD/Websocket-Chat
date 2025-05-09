@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Token Capture</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #log-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        #log {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            background-color: #f8f8f8;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .log-entry.token {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .log-entry.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .log-entry.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        #login-form {
+            text-align: center;
+            margin: 20px 0;
+        }
+        input[type="text"], input[type="password"] {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1976d2;
+        }
+        .token-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            display: none;
+        }
+        .token-info.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Token Capture</h1>
+    <div id="login-form">
+        <input type="text" id="username-input" placeholder="Username (Alice or Bob)" autocomplete="off">
+        <input type="password" id="password-input" placeholder="Password" autocomplete="off">
+        <button onclick="login()">Login</button>
+    </div>
+    <div id="token-info" class="token-info">
+        <h3>Captured Token Information</h3>
+        <p><strong>Bearer Token:</strong> <span id="bearer-token"></span></p>
+        <p><strong>Decoded Token:</strong> <pre id="decoded-token"></pre></p>
+    </div>
+    <div id="status" class="status disconnected">Disconnected</div>
+    <div id="log-container">
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let ws;
+        let capturedToken = null;
+        const logElement = document.getElementById('log');
+        const statusElement = document.getElementById('status');
+        const tokenInfoElement = document.getElementById('token-info');
+        const bearerTokenElement = document.getElementById('bearer-token');
+        const decodedTokenElement = document.getElementById('decoded-token');
+
+        function addLogEntry(message, type = '') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function displayTokenInfo(token) {
+            try {
+                // Display bearer token
+                bearerTokenElement.textContent = token;
+
+                // Decode and display token payload
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+
+                const decodedToken = JSON.parse(jsonPayload);
+                decodedTokenElement.textContent = JSON.stringify(decodedToken, null, 2);
+                tokenInfoElement.classList.add('visible');
+            } catch (error) {
+                addLogEntry(`Error decoding token: ${error.message}`, 'error');
+            }
+        }
+
+        async function login() {
+            const username = document.getElementById('username-input').value.trim();
+            const password = document.getElementById('password-input').value.trim();
+
+            if (!username || !password) {
+                addLogEntry('Please enter both username and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                capturedToken = data.token;
+                addLogEntry(`Token captured: ${capturedToken}`, 'token');
+                displayTokenInfo(capturedToken);
+                
+                // Connect to WebSocket and then redirect
+                //connectAndRedirect();
+            } catch (error) {
+                addLogEntry(`Login error: ${error.message}`, 'error');
+            }
+        }
+
+        function connectAndRedirect() {
+            ws = new WebSocket(`ws://${window.location.hostname}:3000`);
+            
+            ws.onopen = () => {
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'status connected';
+                addLogEntry('WebSocket connection established', 'success');
+                
+                // Send join message with bearer token
+                ws.send(JSON.stringify({
+                    type: 'join',
+                    token: capturedToken
+                }));
+                
+                // Redirect to chat after a short delay
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addLogEntry(`Message received: ${JSON.stringify(data)}`);
+                } catch (error) {
+                    addLogEntry(`Error parsing message: ${error.message}`, 'error');
+                }
+            };
+
+            ws.onerror = (error) => {
+                addLogEntry(`WebSocket error: ${error.message}`, 'error');
+            };
+
+            ws.onclose = () => {
+                statusElement.textContent = 'Disconnected';
+                statusElement.className = 'status disconnected';
+                addLogEntry('WebSocket connection closed');
+            };
+        }
+
+        // Add some helpful information
+        addLogEntry('Enter credentials to capture token and redirect to chat');
+    </script>
+</body>
+</html> 
