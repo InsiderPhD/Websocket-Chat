@@ -39,7 +39,7 @@ docker build -t websocket-chat .
 docker run -p 3000:3000 websocket-chat
 ```
 
-4. Open `index.html` in your web browser (you can use any static file server or simply double-click the file)
+4. Visit [http://localhost:3000](http://localhost:3000)
 
 ## Usage
 
