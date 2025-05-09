@@ -19,12 +19,18 @@ A simple real-time chat application using WebSocket technology.
 npm install
 ```
 
-2. Start the server:
+2. Initialize the database:
+```bash
+npm run init-db
+```
+
+3. Start the server:
 ```bash
 npm start
 ```
 
-3. Open `index.html` in your web browser (you can use any static file server or simply double-click the file)
+
+3. Visit [http://localhost:3000](http://localhost:3000)
 
 ### Option 2: Docker Setup
 
@@ -55,6 +61,23 @@ To view logs:
 ```bash
 docker logs chat-app
 ```
+
+## Database Setup
+
+The application uses SQLite as its database. The database is automatically initialized with the following default users:
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin    | admin123 | Admin |
+| alice    | password123 | User |
+| bob      | password123 | User |
+
+### Database Management
+
+- The database is automatically initialized during Docker container build
+- For local development, run `npm run init-db` to initialize the database
+- The database file is stored in the `data` directory
+- In Docker, the database is persisted in the container's `/app/data` directory
 
 ## Usage
 
