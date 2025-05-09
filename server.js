@@ -334,7 +334,37 @@ wss.on('connection', (ws, req) => {
                             case 'kick':
                                 if (role === 'admin') {
                                     const targetUser = args[0];
+                                    if (!targetUser) {
+                                        ws.send(JSON.stringify({
+                                            type: 'system',
+                                            message: 'Please specify a user to kick (e.g., /kick username)',
+                                            timestamp: new Date().toISOString()
+                                        }));
+                                        return;
+                                    }
+                                    if (!Array.from(clients.keys()).includes(targetUser)) {
+                                        ws.send(JSON.stringify({
+                                            type: 'system',
+                                            message: `User ${targetUser} is not online`,
+                                            timestamp: new Date().toISOString()
+                                        }));
+                                        return;
+                                    }
+                                    if (targetUser === username) {
+                                        ws.send(JSON.stringify({
+                                            type: 'system',
+                                            message: 'You cannot kick yourself',
+                                            timestamp: new Date().toISOString()
+                                        }));
+                                        return;
+                                    }
                                     kickUser(targetUser);
+                                } else {
+                                    ws.send(JSON.stringify({
+                                        type: 'system',
+                                        message: 'Only administrators can use the kick command',
+                                        timestamp: new Date().toISOString()
+                                    }));
                                 }
                                 break;
                             case 'wave':
@@ -496,6 +526,12 @@ function kickUser(targetUsername) {
         // Give a small delay to ensure the message is sent before closing
         setTimeout(() => {
             console.log('Closing kicked user connection');
+            // Send logout command to clear the token
+            targetClient.send(JSON.stringify({
+                type: 'logout',
+                message: 'You have been logged out due to being kicked',
+                timestamp: new Date().toISOString()
+            }));
             targetClient.close();
             // Broadcast updated user list after closing
             broadcastUserList();

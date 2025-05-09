@@ -358,6 +358,7 @@
             </div>
             <div id="chatMessages" class="chat-messages"></div>
             <div class="chat-input">
+                <span id="currentUsername" style="margin-right: 10px; font-weight: bold; display: inline-flex; align-items: center; height: 100%;"></span>
                 <input type="text" id="messageInput" placeholder="Type a message... (Commands: /wave, /nick, /away)">
                 <button id="sendButton">Send</button>
                 <div id="autocompleteContainer" class="autocomplete-container"></div>
@@ -373,7 +374,7 @@
         <div class="modal-content">
             <h3>You've been kicked!</h3>
             <p>An administrator has removed you from the chat.</p>
-            <button onclick="window.location.reload()">OK</button>
+            <button onclick="handleKickLogout()">OK</button>
         </div>
     </div>
 
@@ -564,6 +565,8 @@
         function showChat() {
             loginContainer.style.display = 'none';
             chatContainer.style.display = 'flex';
+            // Update the current username display
+            document.getElementById('currentUsername').textContent = `${currentUser}:`;
             connectWebSocket();
         }
 
@@ -692,25 +695,19 @@
                 }
             } else if (data.type === 'message') {
                 const usernameSpan = document.createElement('span');
-                usernameSpan.className = `message-username ${data.role || 'user'}`;
+                usernameSpan.className = `message-username ${data.username === currentUser ? 'user' : ''}`;
                 usernameSpan.textContent = data.username;
-
+                
                 const contentSpan = document.createElement('span');
                 contentSpan.className = 'message-content';
                 contentSpan.textContent = data.message;
-                // Add special styling for wave messages
-                if (data.message.startsWith('(') && data.message.endsWith(')')) {
-                    contentSpan.style.fontFamily = 'monospace';
-                    contentSpan.style.fontSize = '1.2em';
-                }
-
-                const timeSpan = document.createElement('span');
-                timeSpan.className = 'message-time';
-                timeSpan.textContent = new Date(data.timestamp).toLocaleTimeString();
-
+                
                 messageDiv.appendChild(usernameSpan);
                 messageDiv.appendChild(contentSpan);
-                messageDiv.appendChild(timeSpan);
+            } else if (data.type === 'logout') {
+                // Handle logout message
+                document.cookie = 'chatToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                window.location.reload();
             } else if (data.type === 'token') {
                 // Handle token updates silently
                 return;
@@ -906,6 +903,22 @@
             
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Add kick logout handler
+        async function handleKickLogout() {
+            try {
+                await fetch('/logout', { method: 'POST' });
+                if (ws) {
+                    ws.close();
+                }
+                document.cookie = 'chatToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout error:', error);
+                // Still reload the page even if logout fails
+                window.location.reload();
+            }
         }
     </script>
 </body>
