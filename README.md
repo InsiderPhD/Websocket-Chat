@@ -48,6 +48,27 @@ docker run -p 3000:3000 websocket-chat
 3. The connection will automatically close after 5 minutes of inactivity
 4. System messages will notify you when users join or leave the chat
 
+## Available Users
+
+The following users are pre-configured in the system:
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin    | admin123 | Admin |
+| alice    | password123 | User |
+| bob      | password123 | User |
+
+## Chat Commands
+
+The following commands are available in the chat:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/wave` | Sends a random waving ASCII art | `/wave` |
+| `/nick` | Changes your display name | `/nick newname` |
+| `/away` | Toggles your away status | `/away` |
+| `/kick` | Kicks a user (admin only) | `/kick username` |
+
 ## Technical Details
 
 - Server runs on port 3000
