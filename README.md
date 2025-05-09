@@ -36,10 +36,25 @@ docker build -t websocket-chat .
 
 3. Run the container:
 ```bash
-docker run -p 3000:3000 websocket-chat
+docker run -p 3000:3000 --name chat-app websocket-chat
 ```
 
 4. Visit [http://localhost:3000](http://localhost:3000)
+
+To stop the container:
+```bash
+docker stop chat-app
+```
+
+To remove the container:
+```bash
+docker rm chat-app
+```
+
+To view logs:
+```bash
+docker logs chat-app
+```
 
 ## Usage
 
@@ -75,3 +90,5 @@ The following commands are available in the chat:
 - Uses the `ws` package for WebSocket functionality
 - Implements ping/pong for connection health checks
 - Messages are broadcast to all connected clients
+- Docker container runs as non-root user for security
+- SQLite database is initialized during container build

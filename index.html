@@ -511,7 +511,9 @@
         // Check for existing session on page load
         window.addEventListener('load', async () => {
             try {
-                const response = await fetch('/api/user');
+                const response = await fetch('/api/user', {
+                    credentials: 'include'  // Include cookies in the request
+                });
                 if (response.ok) {
                     const data = await response.json();
                     currentUser = data.user.username;

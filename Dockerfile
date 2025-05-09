@@ -11,6 +11,13 @@ RUN npm install
 # Copy the rest of the application
 COPY . .
 
+# Create data directory for SQLite database
+RUN mkdir -p data && \
+    chown -R node:node /app
+
+# Switch to non-root user
+USER node
+
 # Initialize the database
 RUN node init-db.js
 
@@ -18,4 +25,4 @@ RUN node init-db.js
 EXPOSE 3000
 
 # Command to run the application
-CMD ["npm", "start"] 
+CMD ["node", "server.js"] 
