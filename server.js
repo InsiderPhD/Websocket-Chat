@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // JWT Configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = 'your-secret-key';
 const TOKEN_EXPIRY = '24h';
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -462,13 +462,9 @@ wss.on('close', () => {
 });
 
 // Start the server
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+server.listen(3000, () => {
+    console.log('Server is running on port 3000');
 });
-
-// Export the Express app for Vercel
-module.exports = app;
 
 // Handle process termination
 process.on('SIGINT', () => {
