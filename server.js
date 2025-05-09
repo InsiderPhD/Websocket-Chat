@@ -59,11 +59,12 @@ db.serialize(() => {
 
 // Token validation middleware
 const validateToken = (req, res, next) => {
-    const token = req.cookies.chatToken;
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
+    const token = authHeader.split(' ')[1];
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
         req.user = decoded;
@@ -100,6 +101,48 @@ app.post('/login', async (req, res) => {
         // Set the token in a cookie
         res.cookie('chatToken', token, COOKIE_OPTIONS);
         res.json({ role: user.role });
+    });
+});
+
+// Registration endpoint
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    // Validate username and password
+    if (username.length < 3) {
+        return res.status(400).json({ error: 'Username must be at least 3 characters long' });
+    }
+    if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Check if username already exists
+    db.get('SELECT * FROM users WHERE username = ?', [username], (err, existingUser) => {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+
+        // Create new user
+        db.run('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+            [username, password, ROLES.USER],
+            function(err) {
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Internal server error' });
+                }
+
+                res.status(201).json({ message: 'Registration successful' });
+            }
+        );
     });
 });
 
@@ -280,8 +323,10 @@ wss.on('connection', (ws, req) => {
                         
                         switch (command.toLowerCase()) {
                             case 'kick':
-                                const targetUser = args[0];
-                                kickUser(targetUser);
+                                if (role === 'admin') {
+                                    const targetUser = args[0];
+                                    kickUser(targetUser);
+                                }
                                 break;
                             case 'wave':
                                 // Send random wave ASCII art
@@ -336,6 +381,8 @@ wss.on('connection', (ws, req) => {
                             case 'away':
                                 // Toggle away status
                                 const newStatus = userStatus.get(username) === 'away' ? 'online' : 'away';
+                                
+                                // Update status
                                 userStatus.set(username, newStatus);
                                 
                                 // Notify everyone of status change
@@ -404,11 +451,16 @@ wss.on('connection', (ws, req) => {
 });
 
 function kickUser(targetUsername) {
+    console.log(`\n=== Kicking User ===`);
+    console.log(`Target username: ${targetUsername}`);
+    
     // Find the client to kick
     const targetClient = Array.from(clients.entries())
         .find(([username, _]) => username === targetUsername)?.[1];
     
     if (targetClient) {
+        console.log('Found target client, sending kick message');
+        
         // Send kick message to the kicked user
         targetClient.send(JSON.stringify({
             type: 'system',
@@ -434,10 +486,13 @@ function kickUser(targetUsername) {
 
         // Give a small delay to ensure the message is sent before closing
         setTimeout(() => {
+            console.log('Closing kicked user connection');
             targetClient.close();
             // Broadcast updated user list after closing
             broadcastUserList();
         }, 100);
+    } else {
+        console.log('Target client not found');
     }
 }
 

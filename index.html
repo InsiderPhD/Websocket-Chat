@@ -164,6 +164,24 @@
             border-radius: 10px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e4e6eb;
+        }
+        .tab-button {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            color: #65676b;
+        }
+        .tab-button.active {
+            color: #1877f2;
+            border-bottom: 2px solid #1877f2;
+        }
         .login-form {
             display: flex;
             flex-direction: column;
@@ -302,14 +320,30 @@
         .autocomplete-item.selected {
             background-color: #e4e6eb;
         }
+        .error-message {
+            color: #dc3545;
+            font-size: 0.9em;
+            margin-top: 5px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div id="loginContainer" class="login-container">
+        <div class="tabs">
+            <button class="tab-button active" data-tab="login">Login</button>
+            <button class="tab-button" data-tab="register">Register</button>
+        </div>
         <form id="loginForm" class="login-form">
             <input type="text" id="username" placeholder="Username" required>
             <input type="password" id="password" placeholder="Password" required>
             <button type="submit">Login</button>
+        </form>
+        <form id="registerForm" class="login-form" style="display: none;">
+            <input type="text" id="regUsername" placeholder="Username" required>
+            <input type="password" id="regPassword" placeholder="Password" required>
+            <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+            <button type="submit">Register</button>
         </form>
         <div class="guest-login">
             <button id="guestLogin">Join as Guest</button>
@@ -352,6 +386,7 @@
         const loginContainer = document.getElementById('loginContainer');
         const chatContainer = document.getElementById('chatContainer');
         const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
         const guestLoginButton = document.getElementById('guestLogin');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
@@ -359,21 +394,82 @@
         const logoutButton = document.getElementById('logoutButton');
         const userList = document.getElementById('userList');
         const autocompleteContainer = document.getElementById('autocompleteContainer');
+        const tabButtons = document.querySelectorAll('.tab-button');
 
-        // Check for existing session on page load
-        window.addEventListener('load', async () => {
+        // Tab switching
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                // Add active class to clicked button
+                button.classList.add('active');
+                
+                // Show/hide appropriate form
+                if (button.dataset.tab === 'login') {
+                    loginForm.style.display = 'flex';
+                    registerForm.style.display = 'none';
+                } else {
+                    loginForm.style.display = 'none';
+                    registerForm.style.display = 'flex';
+                }
+            });
+        });
+
+        // Registration form submission
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value;
+            const password = document.getElementById('regPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Clear any existing error messages
+            const existingError = registerForm.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = 'Passwords do not match';
+                registerForm.appendChild(errorDiv);
+                return;
+            }
+
             try {
-                const response = await fetch('/api/user', {
-                    credentials: 'include' // Important: include cookies in the request
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
                 });
+
+                const data = await response.json();
                 if (response.ok) {
-                    const data = await response.json();
-                    currentUser = data.user.username;
-                    currentRole = data.user.role;
-                    showChat();
+                    // Switch to login tab and show success message
+                    document.querySelector('[data-tab="login"]').click();
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'error-message';
+                    successDiv.style.color = '#28a745';
+                    successDiv.textContent = 'Registration successful! Please login.';
+                    loginForm.appendChild(successDiv);
+                    
+                    // Clear registration form
+                    registerForm.reset();
+                } else {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    errorDiv.textContent = data.error || 'Registration failed';
+                    registerForm.appendChild(errorDiv);
                 }
             } catch (error) {
-                console.log('No active session');
+                console.error('Registration error:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = 'Registration failed. Please try again.';
+                registerForm.appendChild(errorDiv);
             }
         });
 
@@ -389,7 +485,6 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    credentials: 'include', // Important: include cookies in the request
                     body: JSON.stringify({ username, password })
                 });
 
@@ -399,11 +494,32 @@
                     currentRole = data.role;
                     showChat();
                 } else {
-                    alert(data.error || 'Login failed');
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    errorDiv.textContent = data.error || 'Login failed';
+                    loginForm.appendChild(errorDiv);
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                alert('Login failed. Please try again.');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = 'Login failed. Please try again.';
+                loginForm.appendChild(errorDiv);
+            }
+        });
+
+        // Check for existing session on page load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data.user.username;
+                    currentRole = data.user.role;
+                    showChat();
+                }
+            } catch (error) {
+                console.log('No active session');
             }
         });
 
@@ -411,13 +527,12 @@
         guestLoginButton.addEventListener('click', async () => {
             try {
                 const response = await fetch('/guest-login', {
-                    method: 'POST',
-                    credentials: 'include' // Important: include cookies in the request
+                    method: 'POST'
                 });
 
                 const data = await response.json();
                 if (response.ok) {
-                    currentUser = data.username;
+                    currentUser = username;
                     currentRole = data.role;
                     showChat();
                 } else {
@@ -432,10 +547,7 @@
         // Logout
         logoutButton.addEventListener('click', async () => {
             try {
-                await fetch('/logout', { 
-                    method: 'POST',
-                    credentials: 'include' // Important: include cookies in the request
-                });
+                await fetch('/logout', { method: 'POST' });
                 if (ws) {
                     ws.close();
                 }
